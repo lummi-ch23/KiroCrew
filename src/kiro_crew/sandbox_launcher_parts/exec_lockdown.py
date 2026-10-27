@@ -38,11 +38,8 @@ def scrub_env(launch):
     # them with -F /dev/null.
     if not environ.get("GIT_SSH_COMMAND"):
         environ["GIT_SSH_COMMAND"] = (
-            "ssh -F /dev/null -o IdentityFile=~/.ssh/id_rsa"
-            " -o IdentityFile=~/.ssh/id_ecdsa"
-            " -o IdentityFile=~/.ssh/id_ed25519"
-            " -o UserKnownHostsFile=~/.ssh/known_hosts"
-            "%s" % launch.strict_host_key_opt
+            "ssh -F /dev/null%s -o UserKnownHostsFile=~/.ssh/known_hosts%s"
+            % (_git_ssh_identity_opts(launch), launch.strict_host_key_opt)
         )
 
     # Gradle would otherwise leave a daemon running after this sandboxed command exits,
@@ -59,6 +56,29 @@ def scrub_env(launch):
         environ["GRADLE_OPTS"] = (
             environ.get("GRADLE_OPTS", "") + " -Dorg.gradle.daemon=false"
         ).strip()
+
+
+_GIT_SSH_IDENTITIES = ("id_rsa", "id_ecdsa", "id_ed25519")
+
+
+def _git_ssh_identity_opts(launch):
+    """The ``-o IdentityFile=`` options for the default ``GIT_SSH_COMMAND``.
+
+    Only the named keys that exist, read after the masks are placed, so a strict
+    tier's tmpfs ``~/.ssh`` is what is looked at. A user-supplied ``IdentityFile``
+    that is missing is an error-level line on every ssh call ("no such identity"),
+    which reads as a failed fetch although the command exits 0.
+
+    The set offered never grows past these three: an explicit ``IdentityFile``
+    replaces ssh's own default list, which also tries ``id_dsa`` and the ``_sk``
+    and ``id_xmss`` keys. So when none of the three exists, all three are still
+    named, as before, rather than none, which would hand the choice back to that
+    wider default list.
+    """
+    present = [
+        name for name in _GIT_SSH_IDENTITIES if os.path.isfile(os.path.join(launch.ssh_dir, name))
+    ]
+    return "".join(" -o IdentityFile=~/.ssh/%s" % name for name in present or _GIT_SSH_IDENTITIES)
 
 
 def drop_privileges(launch):
