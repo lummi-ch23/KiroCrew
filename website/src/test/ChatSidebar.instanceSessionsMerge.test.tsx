@@ -273,6 +273,29 @@ describe('ChatSidebar – remote crew sessions in the live list', () => {
     expect(screen.getByTestId('crew-group-inst-a')).toHaveTextContent('REMOTE middle row')
   })
 
+  it("leaves a peer's crew members out of the list, as it leaves local ones out", async () => {
+    localStorage.setItem(PREVIEW_INSTANCE_SESSIONS, '1')
+    // A peer's Crew Mode chat and one of its crew members, both OPEN on the peer.
+    // The peer's route sends both; the list must show the chat and not the member,
+    // exactly as `crewModeView` hides this machine's own crew members.
+    instanceChatSlotsMock.mockResolvedValue([
+      { ...DEFAULT_REMOTE_SLOT, key: 'peer-root', row_identity: 'inst-a:peer-root', title: 'Peer crew chat', crew_mode_root: true },
+      {
+        ...DEFAULT_REMOTE_SLOT,
+        key: 'peer-member',
+        row_identity: 'inst-a:peer-member',
+        title: 'Peer crew member',
+        crew_root: 'peer-root',
+      },
+    ])
+    renderSidebar()
+    await waitFor(() => {
+      expect(screen.getByTestId('crew-group-inst-a')).toHaveTextContent('Peer crew chat')
+    })
+    expect(screen.queryByText('Peer crew member')).toBeNull()
+    expect(screen.getByText('LIVE newer slot')).toBeInTheDocument()
+  })
+
   it('prints each date-segment header once, even when a remote row was created in another bucket', async () => {
     localStorage.setItem(PREVIEW_INSTANCE_SESSIONS, '1')
     const { container } = renderSidebar()
