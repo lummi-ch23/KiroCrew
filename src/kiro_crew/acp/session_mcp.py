@@ -116,6 +116,7 @@ from kiro_crew.mcp_cleanup import (
     KIROCREW_BIN_MCP_SERVERS,
     mcp_entry_is_muted,
 )
+from kiro_crew.template_mcp_additions import merge_at_spawn
 from kiro_crew.user_json import loads_user_jsonc
 
 logger = logging.getLogger(__name__)
@@ -742,7 +743,13 @@ def _session_spec_and_snapshot_for(
     apply the same verdict through :func:`trusted_project_agent_spec`; the
     unresolved-ref diagnostic on every host keeps the plain resolution.
     """
-    return _agent_spec_and_snapshot_for(agent, work_dir, mirrored_session=True)
+    spec, snapshot = _agent_spec_and_snapshot_for(agent, work_dir, mirrored_session=True)
+    # The one read every array host's servers come from, so a template Crew does
+    # not own gets its approved additions merged here, at spawn, and never in its
+    # file (``template_mcp_additions.merge_at_spawn``). A derived or Crew-owned spec
+    # comes back unchanged: its installer already merged them, and the snapshot
+    # still vouches for exactly those bytes.
+    return merge_at_spawn(agent, spec), snapshot
 
 
 def _agent_spec_and_snapshot_for(
@@ -1445,13 +1452,16 @@ def _declared_launch(source: Mapping[str, Any]) -> tuple[str, list[str]]:
 _NATIVE_ELEMENT_KEYS: frozenset[str] = _agent_mod._MANAGED_MCP_ENTRY_KEYS - {"timeout"}
 
 # Kiro Crew's OWN bookkeeping on an entry: the provenance marker the global-file
-# sync stamps on an entry it authored, and the derived-field record the spec
-# rebuild writes. Neither is a setting kiro-cli reads -- unknown keys are dropped
-# at deserialization -- so neither restricts the server, and an element that
+# sync stamps on an entry it authored, the derived-field record the spec
+# rebuild writes, and the mark on an entry it projected from the template additions
+# record. None is a setting kiro-cli reads -- unknown keys are dropped
+# at deserialization -- so none restricts the server, and an element that
 # omits them expresses everything the declaration says. Judging them as "a key
 # the element cannot carry" would refuse the default agent for Crew's own stamp,
 # with a message telling the user to remove it.
-_NATIVE_INERT_KEYS = frozenset({mcp_provenance.MARKER_KEY, mcp_provenance.DERIVED_KEY})
+_NATIVE_INERT_KEYS = frozenset(
+    {mcp_provenance.MARKER_KEY, mcp_provenance.DERIVED_KEY, mcp_provenance.ADDITION_KEY}
+)
 
 # How the three places a managed server is declared are named to a user. These
 # land in the message that refuses a projected search agent, so they name the

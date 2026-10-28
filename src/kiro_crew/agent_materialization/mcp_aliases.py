@@ -20,7 +20,7 @@ from typing import Any
 from kiro_crew import agent as agent_mod
 from kiro_crew import user_json
 from kiro_crew.mcp_cleanup import purge_deleted_proxy_from_config
-from kiro_crew.mcp_provenance import DERIVED_KEY
+from kiro_crew.mcp_provenance import ADDITION_KEY, DERIVED_KEY
 from kiro_crew.mcp_utils import mcp_server_alias
 
 
@@ -44,11 +44,15 @@ def _norm_mcp_spec(spec: Any) -> Any:
     Comparing it would make them differ and mint the ever-growing suffix this
     function exists to prevent -- and it would do so asymmetrically, since only the
     population with no other config source is ever recorded.
+    :data:`~kiro_crew.mcp_provenance.ADDITION_KEY` is excluded on the same argument:
+    it records where the entry came from, not how the server launches.
     """
     if not isinstance(spec, dict):
         return spec
     return {
-        k: v for k, v in spec.items() if k != DERIVED_KEY and not (k in ("env", "args") and not v)
+        k: v
+        for k, v in spec.items()
+        if k not in (DERIVED_KEY, ADDITION_KEY) and not (k in ("env", "args") and not v)
     }
 
 

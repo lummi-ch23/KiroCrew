@@ -660,7 +660,31 @@ def rebuild_agent_config(
     # See docs/architecture/mcp.md. CC global is kept only as a gap-filler so
     # the Claude Code provider can be re-enabled later without rework; it must
     # not shadow a Kiro-global entry.
+    # Drop what the last rebuild projected from the per-template MCP additions record
+    # (each such entry is marked on the entry itself), BEFORE the sources merge, so a
+    # name a source now declares is the source's alone.
+    from kiro_crew import template_mcp_additions
+
+    template_mcp_additions.strip_projected(config)
     sources = mcp_sources.merge_mcp_sources(config)
+    # Then project what the record holds now for the default agent, at the lowest
+    # precedence: a name any source above declares, or the user wrote, keeps its entry.
+    # Before resolution, so an added server's command is resolved like every other.
+    # Only ``mcpServers`` and the ``@server`` mount in ``tools`` move; no grant comes
+    # from the record.
+    template_mcp_additions.project_into_rendered_spec(
+        template_mcp_additions.DEFAULT_TEMPLATE,
+        config,
+        claimed=frozenset(
+            {
+                *sources.kirocrew,
+                *sources.kiro_global,
+                *sources.provider_global,
+                *sources.managed_names,
+                *_app_owned_at_start,
+            }
+        ),
+    )
 
     # Resolve MCP commands to absolute paths and validate.
     #

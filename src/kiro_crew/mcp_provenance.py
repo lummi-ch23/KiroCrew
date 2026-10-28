@@ -89,6 +89,16 @@ DERIVED_KEY = "x-kirocrew-derived"
 WITHHELD_KEY = "x-kirocrew-withheld"
 
 
+# A FOURTH reserved key: the agent-spec rebuild projected this entry from the
+# per-template MCP additions record (``template_mcp_additions``), so the next rebuild
+# drops it and re-projects whatever the record holds then. It lives on the entry, in
+# the file the entry is written to, so ownership is written atomically with the
+# entry. Like :data:`MARKER_KEY` it is a declaration of who may write, not a
+# security boundary: a user who deletes it reclaims the entry, and an edit that
+# keeps it is replaced on the next rebuild.
+ADDITION_KEY = "x-kirocrew-addition"
+
+
 def is_withheld_mute(entry: Any) -> bool:
     """True when *entry*'s mute is the rebuild's :data:`WITHHELD_KEY` mute."""
     return isinstance(entry, dict) and entry.get(WITHHELD_KEY) is True
