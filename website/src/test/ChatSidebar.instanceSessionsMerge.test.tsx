@@ -273,13 +273,11 @@ describe('ChatSidebar – remote crew sessions in the live list', () => {
     expect(screen.getByTestId('crew-group-inst-a')).toHaveTextContent('REMOTE middle row')
   })
 
-  it("reads a peer's crew rows through the same person rule as local ones", async () => {
+  it("leaves a peer's crew members out of the list, as it leaves local ones out", async () => {
     localStorage.setItem(PREVIEW_INSTANCE_SESSIONS, '1')
     // A peer's Crew Mode chat and one of its crew members, both OPEN on the peer.
-    // The peer's route sends both and `sessionSources` passes them through
-    // `crewModeView`, the one rule local rows go through. On this part that rule
-    // is inert (the Crew panel part turns it on), so both rows are listed and
-    // the member keeps its `crew_root`, which is what the rule will read.
+    // The peer's route sends both; the list must show the chat and not the member,
+    // exactly as `crewModeView` hides this machine's own crew members.
     instanceChatSlotsMock.mockResolvedValue([
       { ...DEFAULT_REMOTE_SLOT, key: 'peer-root', row_identity: 'inst-a:peer-root', title: 'Peer crew chat', crew_mode_root: true },
       {
@@ -294,7 +292,7 @@ describe('ChatSidebar – remote crew sessions in the live list', () => {
     await waitFor(() => {
       expect(screen.getByTestId('crew-group-inst-a')).toHaveTextContent('Peer crew chat')
     })
-    expect(screen.getByTestId('crew-group-inst-a')).toHaveTextContent('Peer crew member')
+    expect(screen.queryByText('Peer crew member')).toBeNull()
     expect(screen.getByText('LIVE newer slot')).toBeInTheDocument()
   })
 
