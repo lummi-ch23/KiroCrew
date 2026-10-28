@@ -3780,6 +3780,34 @@ Two subtleties:
   evidence is completed checks, and a running lane has none yet. `requested` is the type
   that carries nothing: it fires at run CREATION, when no lane can have a verdict yet and
   readiness has already published `checking` from the `pull_request_target` path.
+
+  That justification is about a RE-RUN, and only about a re-run, so the subscription now
+  only acts on one. A `workflow_run` dispatch whose `run_attempt` is 1 is the case the
+  paragraph above calls "the type that carries nothing": `pull_request_target:
+  synchronize` has already published `checking` for that head. Measured over a day, 7.29%
+  of monitored-lane runs carried `run_attempt > 1`, and the other ~93% were paying for a
+  hold nothing needed -- the single largest line item in this repository's run creation.
+  The predicate that drops them has to be written TWICE, in the job's `if:` and as a
+  fourth segment of the `workflow_run` concurrency key, because workflow-level
+  `concurrency` is evaluated at run creation and can read only `github`, `inputs` and
+  `vars`: not `env`, and not a job output. Gating the `if:` alone would let a dropped
+  dispatch cancel a real in-flight hold (one group per head, `cancel-in-progress: true`)
+  and then skip, which is the stale-green window the subscription exists to close; moving
+  the predicate to `cancel-in-progress` instead would leave each superseded run PENDING in
+  the group rather than gone. Splitting the key into `hold` and `noop` groups keeps one
+  pending no-op per head, and it completes without allocating a runner. If the two
+  expressions ever drift the window reopens silently, so
+  `test_ai_review_workflows.py` parses both and compares them literally.
+
+  `Issue Gate` and `Security Scope Review` are exempt from that predicate on a first
+  attempt. They are the only monitored lanes whose `pull_request` trigger carries
+  `labeled`/`unlabeled`, which readiness' own `pull_request_target` trigger does not
+  subscribe to, so for those two a first attempt can be the only hold a running blocking
+  lane gets. Every other lane's first-attempt start is either excluded already by the job
+  gate's event clauses (`merge_group`, `push`, `schedule`, `workflow_dispatch`) or an
+  activity type `pull_request_target` hears. That enumeration is a test too, not a comment:
+  adding `labeled` to a third lane fails `test_ai_review_workflows.py` rather than
+  silently losing that lane's first hold.
 - **A lane that is itself `workflow_run`-triggered cannot be monitored.** GitHub runs such
   a workflow from the default branch, so the `workflow_run` payload its completion hands
   readiness names the default branch as `head_branch` and the default branch's tip as
