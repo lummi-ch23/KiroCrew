@@ -96,6 +96,28 @@ describe('useKeyboardViewportReset', () => {
     expect(scrollTo).toHaveBeenCalledWith(0, 0)
   })
 
+  it('keeps the composer pan on iPhone, where innerHeight shrinks with the keyboard', () => {
+    // iPhone Safari reports the keyboard-reduced height in window.innerHeight
+    // as well as visualViewport.height, so their difference stays ~0 while the
+    // keyboard is up. Reading that as "closed" scrolled the page back to 0,0
+    // and left the composer under the keyboard.
+    const { vv, fire } = installVisualViewport(800)
+    renderHook(() => useKeyboardViewportReset())
+    vv.height = 450 // keyboard opens...
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 450 }) // ...and innerHeight follows
+    fire('resize')
+    window.dispatchEvent(new Event('scroll')) // Safari pans to reveal the composer
+    fire('scroll')
+    vi.advanceTimersByTime(1000)
+    expect(scrollTo).not.toHaveBeenCalled()
+
+    vv.height = 800 // keyboard closed: the stale pan is still undone
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 })
+    fire('resize')
+    vi.advanceTimersByTime(1000)
+    expect(scrollTo).toHaveBeenCalledWith(0, 0)
+  })
+
   it('leaves document scroll alone on routes without the dashboard shell', () => {
     const { vv, fire } = installVisualViewport(500)
     document.body.replaceChildren()

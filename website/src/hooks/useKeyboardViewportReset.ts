@@ -32,8 +32,22 @@ export function useKeyboardViewportReset(): void {
     const vv = window.visualViewport
     const timers = new Set<number>()
 
-    const keyboardOpen = () =>
-      !!vv && window.innerHeight - vv.height > KEYBOARD_THRESHOLD_PX
+    // The keyboard-free height to compare against. iPadOS keeps innerHeight at
+    // the full layout height, but iPhone Safari shrinks innerHeight together
+    // with visualViewport.height, so innerHeight alone reads an open keyboard
+    // as closed there. Also keep the tallest visual height seen at this width
+    // (a rotation or window resize changes the width and starts over).
+    let restWidth = vv?.width
+    let restHeight = vv?.height ?? 0
+    const keyboardOpen = () => {
+      if (!vv) return false
+      if (vv.width !== restWidth) {
+        restWidth = vv.width
+        restHeight = vv.height
+      }
+      restHeight = Math.max(restHeight, vv.height)
+      return Math.max(window.innerHeight, restHeight) - vv.height > KEYBOARD_THRESHOLD_PX
+    }
 
     const reset = () => {
       if (keyboardOpen()) return
